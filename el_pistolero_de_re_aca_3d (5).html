@@ -1,0 +1,1642 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>El pistolero de Reñaca 3D</title>
+    <!-- Tailwind CSS for UI -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Three.js CDN -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <style>
+        * {
+            box-sizing: border-box;
+            user-select: none;
+            -webkit-user-select: none;
+            touch-action: manipulation;
+        }
+
+        body, html {
+            width: 100%;
+            height: 100%;
+            margin: 0;
+            padding: 0;
+            overflow: hidden;
+            background-color: #72bbf8;
+            font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+            color: #fff;
+        }
+
+        #canvas-container {
+            width: 100vw;
+            height: 100vh;
+            position: absolute;
+            top: 0;
+            left: 0;
+            z-index: 1;
+        }
+
+        /* Reticle / Crosshair */
+        #crosshair {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            width: 16px;
+            height: 16px;
+            transform: translate(-50%, -50%);
+            pointer-events: none;
+            z-index: 10;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border: 2px solid #ff1744;
+            border-radius: 50%;
+            box-shadow: 0 0 10px rgba(255, 23, 68, 0.9), inset 0 0 4px rgba(255, 23, 68, 0.7);
+        }
+
+        #crosshair::before, #crosshair::after {
+            display: none;
+        }
+
+        #crosshair-dot {
+            width: 4px;
+            height: 4px;
+            background-color: #ff1744;
+            border-radius: 50%;
+            box-shadow: 0 0 8px #ff1744;
+        }
+
+        /* Header Title */
+        #game-header {
+            position: absolute;
+            top: 15px;
+            left: 50%;
+            transform: translateX(-50%);
+            font-size: 22px;
+            font-weight: 900;
+            color: #ffab00;
+            text-shadow: 0 0 12px rgba(255, 171, 0, 0.8), 2px 2px 4px #000;
+            letter-spacing: 2px;
+            text-transform: uppercase;
+            z-index: 15;
+            pointer-events: none;
+            background: rgba(10, 25, 45, 0.85);
+            padding: 6px 22px;
+            border-radius: 20px;
+            border: 2px solid #ffab00;
+            backdrop-filter: blur(6px);
+            white-space: nowrap;
+        }
+
+        /* HUD elements */
+        #hud {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            pointer-events: none;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            z-index: 15;
+        }
+
+        .stat-box {
+            background: rgba(10, 25, 45, 0.85);
+            border: 2px solid #00b0ff;
+            padding: 8px 16px;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: bold;
+            letter-spacing: 1px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.6);
+            backdrop-filter: blur(6px);
+        }
+
+        .stat-value {
+            color: #00ffcc;
+            font-size: 20px;
+        }
+
+        /* Prompt */
+        #action-prompt {
+            position: absolute;
+            bottom: 40px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(0, 230, 118, 0.95);
+            color: #000;
+            padding: 12px 26px;
+            border-radius: 30px;
+            font-size: 18px;
+            font-weight: bold;
+            box-shadow: 0 0 25px rgba(0, 230, 118, 0.8);
+            display: none;
+            animation: pulse 1s infinite alternate;
+            z-index: 15;
+            pointer-events: none;
+        }
+
+        @keyframes pulse {
+            from { transform: translateX(-50%) scale(1); }
+            to { transform: translateX(-50%) scale(1.06); }
+        }
+
+        #btn-in-game-credits {
+            position: absolute;
+            bottom: 20px;
+            right: 20px;
+            background: linear-gradient(135deg, #ffab00, #ff6d00);
+            color: #000;
+            border: none;
+            padding: 10px 20px;
+            font-size: 15px;
+            font-weight: bold;
+            border-radius: 25px;
+            cursor: pointer;
+            box-shadow: 0 4px 15px rgba(255, 171, 0, 0.6);
+            z-index: 25;
+            transition: all 0.2s ease;
+        }
+
+        #btn-view-toggle {
+            position: absolute;
+            bottom: 20px;
+            right: 150px;
+            background: linear-gradient(135deg, #00e676, #00b0ff);
+            color: #000;
+            border: none;
+            padding: 10px 20px;
+            font-size: 15px;
+            font-weight: bold;
+            border-radius: 25px;
+            cursor: pointer;
+            box-shadow: 0 4px 15px rgba(0, 230, 118, 0.6);
+            z-index: 25;
+            transition: all 0.2s ease;
+        }
+
+        #btn-in-game-credits:hover, #btn-view-toggle:hover {
+            transform: scale(1.08);
+            box-shadow: 0 0 22px rgba(255, 171, 0, 0.9);
+        }
+
+        .overlay-screen {
+            position: absolute;
+            inset: 0;
+            background: rgba(8, 15, 30, 0.94);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            z-index: 30;
+            text-align: center;
+            backdrop-filter: blur(8px);
+            padding: 20px;
+        }
+
+        .modal-overlay {
+            position: absolute;
+            inset: 0;
+            background: rgba(0, 0, 0, 0.85);
+            display: none;
+            justify-content: center;
+            align-items: center;
+            z-index: 40;
+            backdrop-filter: blur(8px);
+        }
+
+        .modal-card {
+            background: #0f1c38;
+            border: 2px solid #ffab00;
+            border-radius: 16px;
+            padding: 28px;
+            max-width: 500px;
+            width: 90%;
+            text-align: left;
+            box-shadow: 0 0 35px rgba(255, 171, 0, 0.4);
+            position: relative;
+            user-select: text !important;
+        }
+
+        .modal-card * {
+            user-select: text !important;
+        }
+
+        /* Floating 3D Orc Shout Labels */
+        .shout-label {
+            position: absolute;
+            background: rgba(255, 23, 68, 0.9);
+            color: #ffffff;
+            font-weight: 900;
+            font-size: 13px;
+            padding: 4px 10px;
+            border-radius: 12px;
+            border: 2px solid #fff;
+            transform: translate(-50%, -100%);
+            pointer-events: none;
+            white-space: nowrap;
+            box-shadow: 0 0 10px rgba(255, 23, 68, 0.8);
+            z-index: 12;
+            transition: opacity 0.2s ease;
+        }
+
+        /* Touch controls overlay for mobile */
+        #touch-controls {
+            position: absolute;
+            inset: 0;
+            pointer-events: none;
+            z-index: 20;
+            display: none;
+        }
+
+        .touch-btn {
+            position: absolute;
+            background: rgba(255, 255, 255, 0.18);
+            border: 2px solid rgba(255, 255, 255, 0.4);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            color: #fff;
+            pointer-events: auto;
+            backdrop-filter: blur(4px);
+        }
+
+        .touch-btn:active {
+            background: rgba(0, 230, 118, 0.5);
+        }
+    </style>
+</head>
+<body>
+
+<div id="canvas-container"></div>
+
+<!-- Crosshair -->
+<div id="crosshair">
+    <div id="crosshair-dot"></div>
+</div>
+
+<!-- Game Title Header -->
+<div id="game-header">El pistolero de Reñaca 3D</div>
+
+<!-- HUD -->
+<div id="hud">
+    <div class="stat-box">ORCOS ELIMINADOS: <span id="score" class="stat-value">0</span></div>
+    <div class="stat-box">ESTADO: <span id="vehicle-status" class="stat-value" style="color: #ffeb3b;">A pie</span></div>
+    <div class="stat-box" style="font-size: 13px; color: #81d4fa;">Clic para enfocar / mirar en 360°</div>
+</div>
+
+<!-- Prompt -->
+<div id="action-prompt">¡Presiona [C] o Toca aquí para subir a la Camioneta!</div>
+
+<!-- Orc Shouts Container -->
+<div id="shouts-container"></div>
+
+<!-- View Toggle & Credits Buttons -->
+<button id="btn-view-toggle" onclick="toggleCameraView()">VISTA: 1ª PERSONA [V]</button>
+<button id="btn-in-game-credits" onclick="openCredits()">CRÉDITOS</button>
+
+<!-- Mobile Touch Controls -->
+<div id="touch-controls">
+    <div id="touch-joystick-zone" style="position: absolute; bottom: 30px; left: 30px; width: 130px; height: 130px; background: rgba(255,255,255,0.08); border-radius: 50%; border: 2px dashed rgba(255,255,255,0.3); pointer-events: auto;">
+        <div id="touch-joystick-stick" style="position: absolute; top: 35px; left: 35px; width: 60px; height: 60px; background: rgba(0,230,118,0.5); border-radius: 50%;"></div>
+    </div>
+    <div id="touch-shoot-btn" class="touch-btn" style="bottom: 40px; right: 40px; width: 75px; height: 75px; background: rgba(255, 23, 68, 0.6); border-color: #ff1744; font-size: 16px;">
+        FUEGO
+    </div>
+    <div id="touch-vehicle-btn" class="touch-btn" style="bottom: 130px; right: 40px; width: 65px; height: 65px; background: rgba(255, 171, 0, 0.6); border-color: #ffab00; font-size: 14px;">
+        ENTRAR [C]
+    </div>
+    <div id="touch-cam-btn" class="touch-btn" style="bottom: 210px; right: 40px; width: 65px; height: 65px; background: rgba(0, 230, 118, 0.6); border-color: #00e676; font-size: 13px; text-align: center;">
+        VISTA [V]
+    </div>
+</div>
+
+<!-- Start Screen Overlay -->
+<div id="start-screen" class="overlay-screen">
+    <h1 class="text-4xl md:text-5xl font-extrabold text-amber-400 mb-4 tracking-wider uppercase drop-shadow-[0_0_15px_rgba(255,171,0,0.6)]">
+        El pistolero de Reñaca 3D
+    </h1>
+    <p class="text-slate-200 text-base md:text-lg max-w-2xl mb-6 leading-relaxed">
+        ¡Defiende la avenida costanera de Reñaca en 1era Persona! Dispara tu rifle plasma con balas que rebotan por los edificios o súbete a tu camioneta 4x4 verde para arrollar a la horda de orcos.
+    </p>
+    
+    <div class="bg-white/5 border border-cyan-400/30 p-5 rounded-xl mb-6 text-left max-w-xl w-full">
+        <h3 class="text-amber-400 font-bold mb-2 text-lg uppercase">Controles en Primera Persona:</h3>
+        <ul class="space-y-2 text-sm md:text-base text-cyan-100">
+            <li>📌 <strong>A pie:</strong> Mueve el ratón para mirar. Teclas [W, A, S, D] para moverte.</li>
+            <li>📌 <strong>En Camioneta:</strong> Dirige la camioneta moviendo el ratón (vista fija hacia el frente). [W/S] acelera o retrocede.</li>
+            <li>📌 <strong>Disparar Bala Rebotadora:</strong> Clic Izquierdo o [ESPACIO]</li>
+            <li>📌 <strong>Subir / Bajar Camioneta 4x4:</strong> Tecla [C]</li>
+            <li>📌 <strong>Alternar Cámara (1ª Persona / 2.5D):</strong> Tecla [V] o Botón en pantalla</li>
+        </ul>
+    </div>
+
+    <div class="flex flex-wrap gap-4 justify-center">
+        <button class="bg-gradient-to-r from-emerald-400 to-cyan-500 text-black font-extrabold text-xl px-10 py-4 rounded-full shadow-[0_0_25px_rgba(0,230,118,0.6)] hover:scale-105 transition-all" onclick="startGame()">
+            ¡JUGAR AHORA!
+        </button>
+        <button class="bg-gradient-to-r from-amber-400 to-orange-500 text-black font-extrabold text-xl px-8 py-4 rounded-full shadow-[0_0_25px_rgba(255,171,0,0.6)] hover:scale-105 transition-all" onclick="openCredits()">
+            CRÉDITOS
+        </button>
+    </div>
+</div>
+
+<!-- Game Over Overlay -->
+<div id="game-over-screen" class="overlay-screen" style="display: none;">
+    <h1 class="text-4xl md:text-5xl font-extrabold text-rose-500 mb-4 tracking-wider uppercase drop-shadow-[0_0_20px_rgba(255,23,68,0.8)]">
+        ¡FIN DEL JUEGO!
+    </h1>
+    <p class="text-slate-200 text-lg max-w-xl mb-4">
+        Los orcos te han alcanzado en la avenida costanera de Reñaca.
+    </p>
+    <div class="stat-box mb-6 text-xl">
+        Orcos Eliminados: <span id="final-score" class="stat-value text-2xl">0</span>
+    </div>
+    <div class="flex flex-wrap gap-4 justify-center">
+        <button class="bg-gradient-to-r from-emerald-400 to-cyan-500 text-black font-extrabold text-xl px-10 py-4 rounded-full shadow-[0_0_25px_rgba(0,230,118,0.6)] hover:scale-105 transition-all" onclick="restartGame()">
+            REINTENTAR
+        </button>
+        <button class="bg-gradient-to-r from-amber-400 to-orange-500 text-black font-extrabold text-xl px-8 py-4 rounded-full shadow-[0_0_25px_rgba(255,171,0,0.6)] hover:scale-105 transition-all" onclick="openCredits()">
+            CRÉDITOS
+        </button>
+    </div>
+</div>
+
+<!-- Modal Créditos -->
+<div id="credits-modal" class="modal-overlay">
+    <div class="modal-card">
+        <h2 class="text-2xl font-bold text-amber-400 mb-4 text-center uppercase tracking-wide">Créditos</h2>
+        <ul class="space-y-4 text-slate-200 text-base mb-6">
+            <li>
+                <strong class="text-emerald-400 block mb-1">Aporte voluntario a PayPal:</strong>
+                <a href="mailto:jcobin@policyofliberty.net" class="text-cyan-400 underline hover:text-cyan-200">jcobin@policyofliberty.net</a>
+            </li>
+            <li>
+                <strong class="text-emerald-400 block mb-1">Sitio Web Oficial:</strong>
+                <a href="https://policyofliberty.com/?lang=es" target="_blank" rel="noopener noreferrer" class="text-cyan-400 underline hover:text-cyan-200">https://policyofliberty.com/?lang=es</a>
+            </li>
+            <li>
+                <strong class="text-emerald-400 block mb-1">COMPRAR LIBROS:</strong>
+                <a href="mailto:batallonjohncobin@gmail.com" class="text-cyan-400 underline hover:text-cyan-200">batallonjohncobin@gmail.com</a>
+            </li>
+        </ul>
+        <button class="block mx-auto bg-rose-600 hover:bg-rose-700 text-white font-bold px-8 py-2 rounded-full transition-all" onclick="closeCredits()">
+            CERRAR
+        </button>
+    </div>
+</div>
+
+<script>
+class SoundSystem {
+    constructor() {
+        this.ctx = null;
+        this.engineOsc = null;
+        this.engineGain = null;
+        this.isEnginePlaying = false;
+    }
+
+    init() {
+        if (!this.ctx) {
+            const AudioCtx = window.AudioContext || window.webkitAudioContext;
+            this.ctx = new AudioCtx();
+        }
+        if (this.ctx && this.ctx.state === 'suspended') {
+            this.ctx.resume();
+        }
+    }
+
+    playLaser() {
+        if (!this.ctx) return;
+        const osc = this.ctx.createOscillator();
+        const gain = this.ctx.createGain();
+        osc.type = 'sawtooth';
+        osc.frequency.setValueAtTime(1400, this.ctx.currentTime);
+        osc.frequency.exponentialRampToValueAtTime(110, this.ctx.currentTime + 0.2);
+        
+        gain.gain.setValueAtTime(0.35, this.ctx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.01, this.ctx.currentTime + 0.2);
+
+        osc.connect(gain);
+        gain.connect(this.ctx.destination);
+        osc.start();
+        osc.stop(this.ctx.currentTime + 0.2);
+    }
+
+    playBounce() {
+        if (!this.ctx) return;
+        const osc = this.ctx.createOscillator();
+        const gain = this.ctx.createGain();
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(500, this.ctx.currentTime);
+        osc.frequency.exponentialRampToValueAtTime(1000, this.ctx.currentTime + 0.08);
+
+        gain.gain.setValueAtTime(0.3, this.ctx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.01, this.ctx.currentTime + 0.08);
+
+        osc.connect(gain);
+        gain.connect(this.ctx.destination);
+        osc.start();
+        osc.stop(this.ctx.currentTime + 0.08);
+    }
+
+    playExplosion() {
+        if (!this.ctx) return;
+        const dur = 0.35;
+        const bufferSize = this.ctx.sampleRate * dur;
+        const buffer = this.ctx.createBuffer(1, bufferSize, this.ctx.sampleRate);
+        const data = buffer.getChannelData(0);
+        for (let i = 0; i < bufferSize; i++) {
+            data[i] = Math.random() * 2 - 1;
+        }
+
+        const noise = this.ctx.createBufferSource();
+        noise.buffer = buffer;
+
+        const filter = this.ctx.createBiquadFilter();
+        filter.type = 'lowpass';
+        filter.frequency.setValueAtTime(600, this.ctx.currentTime);
+        filter.frequency.linearRampToValueAtTime(30, this.ctx.currentTime + dur);
+
+        const gain = this.ctx.createGain();
+        gain.gain.setValueAtTime(0.6, this.ctx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.01, this.ctx.currentTime + dur);
+
+        noise.connect(filter);
+        filter.connect(gain);
+        gain.connect(this.ctx.destination);
+
+        noise.start();
+    }
+
+    playDoor() {
+        if (!this.ctx) return;
+        const osc = this.ctx.createOscillator();
+        const gain = this.ctx.createGain();
+        osc.type = 'triangle';
+        osc.frequency.setValueAtTime(180, this.ctx.currentTime);
+        osc.frequency.exponentialRampToValueAtTime(50, this.ctx.currentTime + 0.2);
+
+        gain.gain.setValueAtTime(0.4, this.ctx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.01, this.ctx.currentTime + 0.2);
+
+        osc.connect(gain);
+        gain.connect(this.ctx.destination);
+        osc.start();
+        osc.stop(this.ctx.currentTime + 0.2);
+    }
+
+    playSplat() {
+        if (!this.ctx) return;
+        const osc = this.ctx.createOscillator();
+        const gain = this.ctx.createGain();
+        osc.type = 'square';
+        osc.frequency.setValueAtTime(160, this.ctx.currentTime);
+        osc.frequency.linearRampToValueAtTime(35, this.ctx.currentTime + 0.3);
+
+        gain.gain.setValueAtTime(0.65, this.ctx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.01, this.ctx.currentTime + 0.3);
+
+        osc.connect(gain);
+        gain.connect(this.ctx.destination);
+        osc.start();
+        osc.stop(this.ctx.currentTime + 0.3);
+    }
+
+    updateEngineSound(speed, isDriving) {
+        if (!this.ctx) return;
+
+        if (isDriving && !this.isEnginePlaying) {
+            this.engineOsc = this.ctx.createOscillator();
+            this.engineGain = this.ctx.createGain();
+            this.engineOsc.type = 'sawtooth';
+            this.engineOsc.frequency.setValueAtTime(50, this.ctx.currentTime);
+
+            const filter = this.ctx.createBiquadFilter();
+            filter.type = 'lowpass';
+            filter.frequency.value = 280;
+
+            this.engineGain.gain.setValueAtTime(0.15, this.ctx.currentTime);
+
+            this.engineOsc.connect(filter);
+            filter.connect(this.engineGain);
+            this.engineGain.connect(this.ctx.destination);
+
+            this.engineOsc.start();
+            this.isEnginePlaying = true;
+        } else if (!isDriving && this.isEnginePlaying) {
+            if (this.engineOsc) {
+                try { this.engineOsc.stop(); this.engineOsc.disconnect(); } catch(e){}
+            }
+            this.isEnginePlaying = false;
+        }
+
+        if (this.isEnginePlaying && this.engineOsc) {
+            const pitch = 50 + (speed * 12);
+            this.engineOsc.frequency.setTargetAtTime(pitch, this.ctx.currentTime, 0.05);
+        }
+    }
+}
+
+const audio = new SoundSystem();
+
+let scene, camera, renderer;
+let gameRunning = false;
+let score = 0;
+let lastShotTime = 0;
+let spawnTimer = 0;
+let waveTime = 0;
+
+// Orc Shouts
+const MONSTER_SHOUTS = [
+    "el q baila pasa",
+    "atrapen a ese facho!",
+    "Capturen a ese Libertario locuaz!"
+];
+
+// Road and World Specs
+const ROAD_WIDTH = 28; // X axis extent: -14 to +14
+const ROAD_LENGTH = 350; // Z axis extent: -175 to +175
+
+// Player State
+const player = {
+    x: 0,
+    z: 20,
+    speed: 12.0,
+    inTruck: false,
+    yaw: 0,
+    pitch: 0,
+    height: 1.7
+};
+
+// Truck State & 3D Object
+const truck = {
+    mesh: null,
+    x: -4,
+    z: 0,
+    speed: 0,
+    maxSpeed: 24.0,
+    acceleration: 0.45,
+    friction: 0.95,
+    angle: 0,
+    width: 3.2,
+    length: 6.0,
+    height: 2.2
+};
+
+let gunGroup;
+let playerMesh;
+let is25DView = false;
+let bullets = [];
+let monsters = [];
+let particles = [];
+let shops3D = [];
+let shoutElements = [];
+
+// Input state
+const keys = {};
+let isPointerLocked = false;
+let touchInput = { moveX: 0, moveY: 0, shoot: false };
+
+function initThree() {
+    const container = document.getElementById('canvas-container');
+
+    scene = new THREE.Scene();
+    scene.background = new THREE.Color(0x72bbf8);
+    scene.fog = new THREE.FogExp2(0x9bd0ff, 0.003);
+
+    camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 500);
+
+    renderer = new THREE.WebGLRenderer({ antialias: true });
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    renderer.shadowMap.enabled = true;
+    renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    container.appendChild(renderer.domElement);
+
+    // Ambient light (Bright daytime daylight)
+    const ambientLight = new THREE.AmbientLight(0xffffff, 0.75);
+    scene.add(ambientLight);
+
+    // Directional light (Bright daytime sun over Pacific Ocean)
+    const sunLight = new THREE.DirectionalLight(0xfffaee, 1.3);
+    sunLight.position.set(60, 90, -40);
+    sunLight.castShadow = true;
+    sunLight.shadow.mapSize.width = 2048;
+    sunLight.shadow.mapSize.height = 2048;
+    sunLight.shadow.camera.near = 0.5;
+    sunLight.shadow.camera.far = 300;
+    const d = 80;
+    sunLight.shadow.camera.left = -d;
+    sunLight.shadow.camera.right = d;
+    sunLight.shadow.camera.top = d;
+    sunLight.shadow.camera.bottom = -d;
+    scene.add(sunLight);
+
+    // Secondary fill light
+    const fillLight = new THREE.DirectionalLight(0x80d8ff, 0.4);
+    fillLight.position.set(-50, 30, 50);
+    scene.add(fillLight);
+
+    buildWorld3D();
+    buildClouds3D();
+    buildTruck3D();
+    buildPlayer3D();
+    buildFirstPersonGun();
+
+    window.addEventListener('resize', onWindowResize);
+    setupInputListeners();
+}
+
+function buildClouds3D() {
+    const cloudMat = new THREE.MeshStandardMaterial({
+        color: 0xffffff,
+        roughness: 0.9,
+        transparent: true,
+        opacity: 0.88,
+        flatShading: true
+    });
+
+    for (let i = 0; i < 26; i++) {
+        const cloudGroup = new THREE.Group();
+        const numPuffs = 4 + Math.floor(Math.random() * 4);
+        for (let j = 0; j < numPuffs; j++) {
+            const size = 5 + Math.random() * 7;
+            const puffGeo = new THREE.DodecahedronGeometry(size, 1);
+            const puff = new THREE.Mesh(puffGeo, cloudMat);
+            puff.position.set(
+                (Math.random() - 0.5) * 16,
+                (Math.random() - 0.5) * 3,
+                (Math.random() - 0.5) * 16
+            );
+            cloudGroup.add(puff);
+        }
+        cloudGroup.position.set(
+            (Math.random() - 0.5) * 220,
+            38 + Math.random() * 18,
+            (Math.random() - 0.5) * 360
+        );
+        scene.add(cloudGroup);
+    }
+}
+
+function buildWorld3D() {
+    // 1. Asphalt Road
+    const roadGeo = new THREE.PlaneGeometry(ROAD_WIDTH, ROAD_LENGTH);
+    const roadMat = new THREE.MeshStandardMaterial({ color: 0x222629, roughness: 0.8 });
+    const road = new THREE.Mesh(roadGeo, roadMat);
+    road.rotation.x = -Math.PI / 2;
+    road.receiveShadow = true;
+    scene.add(road);
+
+    // Yellow center lines
+    const stripeGeo = new THREE.PlaneGeometry(0.4, 4);
+    const stripeMat = new THREE.MeshBasicMaterial({ color: 0xffb300 });
+    for (let z = -ROAD_LENGTH / 2 + 5; z < ROAD_LENGTH / 2; z += 9) {
+        const stripe = new THREE.Mesh(stripeGeo, stripeMat);
+        stripe.rotation.x = -Math.PI / 2;
+        stripe.position.set(0, 0.02, z);
+        scene.add(stripe);
+    }
+
+    // Curbs
+    const curbGeo = new THREE.BoxGeometry(0.8, 0.4, ROAD_LENGTH);
+    const curbMat = new THREE.MeshStandardMaterial({ color: 0x808e9b });
+    const curbLeft = new THREE.Mesh(curbGeo, curbMat);
+    curbLeft.position.set(-ROAD_WIDTH / 2 - 0.4, 0.2, 0);
+    curbLeft.receiveShadow = true;
+    scene.add(curbLeft);
+
+    const curbRight = new THREE.Mesh(curbGeo, curbMat);
+    curbRight.position.set(ROAD_WIDTH / 2 + 0.4, 0.2, 0);
+    curbRight.receiveShadow = true;
+    scene.add(curbRight);
+
+    // 2. Beach Sand Strip
+    const sandGeo = new THREE.PlaneGeometry(40, ROAD_LENGTH);
+    const sandMat = new THREE.MeshStandardMaterial({ color: 0xffe082, roughness: 0.9 });
+    const sand = new THREE.Mesh(sandGeo, sandMat);
+    sand.rotation.x = -Math.PI / 2;
+    sand.position.set(ROAD_WIDTH / 2 + 20, -0.05, 0);
+    sand.receiveShadow = true;
+    scene.add(sand);
+
+    // 3. Ocean Water Plane
+    const oceanGeo = new THREE.PlaneGeometry(300, ROAD_LENGTH + 200);
+    const oceanMat = new THREE.MeshStandardMaterial({
+        color: 0x00838f,
+        roughness: 0.1,
+        metalness: 0.8,
+        transparent: true,
+        opacity: 0.88
+    });
+    const ocean = new THREE.Mesh(oceanGeo, oceanMat);
+    ocean.rotation.x = -Math.PI / 2;
+    ocean.position.set(ROAD_WIDTH / 2 + 180, -0.3, 0);
+    scene.add(ocean);
+
+    // 4. Beach Props (Umbrellas & Palm Trees)
+    for (let z = -ROAD_LENGTH / 2 + 15; z < ROAD_LENGTH / 2 - 15; z += 18) {
+        // Umbrella
+        const umbGroup = new THREE.Group();
+        const poleGeo = new THREE.CylinderGeometry(0.08, 0.08, 2.5);
+        const poleMat = new THREE.MeshStandardMaterial({ color: 0x5d4037 });
+        const pole = new THREE.Mesh(poleGeo, poleMat);
+        pole.position.y = 1.25;
+        umbGroup.add(pole);
+
+        const topGeo = new THREE.ConeGeometry(2.0, 0.8, 8);
+        const topMat = new THREE.MeshStandardMaterial({ color: (z % 36 === 0) ? 0xff1744 : 0x00e5ff });
+        const top = new THREE.Mesh(topGeo, topMat);
+        top.position.y = 2.4;
+        umbGroup.add(top);
+
+        umbGroup.position.set(ROAD_WIDTH / 2 + 6, 0, z);
+        scene.add(umbGroup);
+
+        // Palm Tree
+        const trunkGeo = new THREE.CylinderGeometry(0.2, 0.35, 5, 6);
+        const trunkMat = new THREE.MeshStandardMaterial({ color: 0x6d4c41 });
+        const trunk = new THREE.Mesh(trunkGeo, trunkMat);
+        trunk.position.set(ROAD_WIDTH / 2 + 14, 2.5, z + 6);
+        trunk.rotation.z = -0.15;
+        scene.add(trunk);
+
+        const leavesGroup = new THREE.Group();
+        const leafGeo = new THREE.BoxGeometry(2.5, 0.05, 0.8);
+        const leafMat = new THREE.MeshStandardMaterial({ color: 0x2e7d32 });
+        for (let i = 0; i < 5; i++) {
+            const leaf = new THREE.Mesh(leafGeo, leafMat);
+            leaf.rotation.y = (i * Math.PI * 2) / 5;
+            leaf.position.x = 1.0;
+            leavesGroup.add(leaf);
+        }
+        leavesGroup.position.set(ROAD_WIDTH / 2 + 14.5, 5.0, z + 6);
+        scene.add(leavesGroup);
+    }
+
+    // 5. Beach Shops (Avenida Costanera Facades on the left)
+    const beachShopsData = [
+        { name: 'HELADERIA REÑACA', color: 0xff2a70, wall: 0xffe6ed },
+        { name: 'SANDWICHERIA EL SECTOR', color: 0xe65100, wall: 0xfff3e0 },
+        { name: 'HOT DOG & COMPLETOS', color: 0xf57f17, wall: 0xfffde7 },
+        { name: 'ARRIENDO TABLAS SURF', color: 0x0052cc, wall: 0xe6f0ff },
+        { name: 'EMPANADAS & JUGOS', color: 0x2e7d32, wall: 0xe8f5e9 },
+        { name: 'CHIRINGUITO COSTERO', color: 0x6a1b9a, wall: 0xf3e5f5 }
+    ];
+
+    let shopIdx = 0;
+    for (let z = -ROAD_LENGTH / 2 + 20; z < ROAD_LENGTH / 2 - 20; z += 24) {
+        const data = beachShopsData[shopIdx % beachShopsData.length];
+        shopIdx++;
+
+        const shopWidth = 14;
+        const shopHeight = 6;
+        const shopDepth = 18;
+
+        const shopGroup = new THREE.Group();
+
+        // Main Building Box
+        const bldgGeo = new THREE.BoxGeometry(shopDepth, shopHeight, shopWidth);
+        const bldgMat = new THREE.MeshStandardMaterial({ color: data.wall, roughness: 0.5 });
+        const bldg = new THREE.Mesh(bldgGeo, bldgMat);
+        bldg.position.set(-shopDepth / 2, shopHeight / 2, 0);
+        bldg.castShadow = true;
+        bldg.receiveShadow = true;
+        shopGroup.add(bldg);
+
+        // Colored Front Frame
+        const frameGeo = new THREE.BoxGeometry(0.5, shopHeight, shopWidth);
+        const frameMat = new THREE.MeshStandardMaterial({ color: data.color });
+        const frame = new THREE.Mesh(frameGeo, frameMat);
+        frame.position.set(0.25, shopHeight / 2, 0);
+        shopGroup.add(frame);
+
+        // Glass Window
+        const winGeo = new THREE.BoxGeometry(0.2, 2.5, shopWidth - 3);
+        const winMat = new THREE.MeshStandardMaterial({ color: 0x81d4fa, transparent: true, opacity: 0.6 });
+        const win = new THREE.Mesh(winGeo, winMat);
+        win.position.set(0.4, 2.0, 0);
+        shopGroup.add(win);
+
+        // Canopy Awning
+        const awnGeo = new THREE.BoxGeometry(2.2, 0.3, shopWidth - 1);
+        const awnMat = new THREE.MeshStandardMaterial({ color: data.color });
+        const awn = new THREE.Mesh(awnGeo, awnMat);
+        awn.position.set(1.1, 3.8, 0);
+        awn.rotation.z = -0.2;
+        shopGroup.add(awn);
+
+        // Neon Sign
+        const signGeo = new THREE.BoxGeometry(0.4, 0.8, shopWidth - 2);
+        const signMat = new THREE.MeshStandardMaterial({ color: data.color, emissive: data.color, emissiveIntensity: 0.6 });
+        const sign = new THREE.Mesh(signGeo, signMat);
+        sign.position.set(0.4, shopHeight + 0.6, 0);
+        shopGroup.add(sign);
+
+        shopGroup.position.set(-ROAD_WIDTH / 2 - 1, 0, z);
+        scene.add(shopGroup);
+        shops3D.push(shopGroup);
+    }
+}
+
+function buildTruck3D() {
+    const truckGroup = new THREE.Group();
+
+    // Body chassis
+    const bodyGeo = new THREE.BoxGeometry(truck.width, 1.2, truck.length);
+    const bodyMat = new THREE.MeshStandardMaterial({ color: 0x1b4d20, roughness: 0.4, metalness: 0.3 }); // Olive green
+    const body = new THREE.Mesh(bodyGeo, bodyMat);
+    body.position.y = 1.0;
+    body.castShadow = true;
+    truckGroup.add(body);
+
+    // Cabin
+    const cabinGeo = new THREE.BoxGeometry(truck.width * 0.9, 1.2, truck.length * 0.45);
+    const cabinMat = new THREE.MeshStandardMaterial({ color: 0x235c29, roughness: 0.3 });
+    const cabin = new THREE.Mesh(cabinGeo, cabinMat);
+    cabin.position.set(0, 2.0, -0.4);
+    cabin.castShadow = true;
+    truckGroup.add(cabin);
+
+    // Wheels
+    const wheelGeo = new THREE.CylinderGeometry(0.65, 0.65, 0.5, 16);
+    const wheelMat = new THREE.MeshStandardMaterial({ color: 0x111111, roughness: 0.9 });
+    const wheelPositions = [
+        [-truck.width / 2 - 0.1, 0.65,  1.8],
+        [ truck.width / 2 + 0.1, 0.65,  1.8],
+        [-truck.width / 2 - 0.1, 0.65, -1.8],
+        [ truck.width / 2 + 0.1, 0.65, -1.8]
+    ];
+    wheelPositions.forEach(pos => {
+        const wheel = new THREE.Mesh(wheelGeo, wheelMat);
+        wheel.rotation.z = Math.PI / 2;
+        wheel.position.set(...pos);
+        wheel.castShadow = true;
+        truckGroup.add(wheel);
+    });
+
+    // Headlights
+    const lightGeo = new THREE.SphereGeometry(0.25, 12, 12);
+    const lightMat = new THREE.MeshBasicMaterial({ color: 0xffffaa });
+    const hlLeft = new THREE.Mesh(lightGeo, lightMat);
+    hlLeft.position.set(-1.1, 1.1, truck.length / 2 + 0.05);
+    truckGroup.add(hlLeft);
+
+    const hlRight = new THREE.Mesh(lightGeo, lightMat);
+    hlRight.position.set(1.1, 1.1, truck.length / 2 + 0.05);
+    truckGroup.add(hlRight);
+
+    // Front Light Spot
+    const headlightSpot = new THREE.SpotLight(0xffffcc, 2.0, 40, Math.PI / 5, 0.3);
+    headlightSpot.position.set(0, 1.2, truck.length / 2 + 0.1);
+    headlightSpot.target.position.set(0, 0, 30);
+    truckGroup.add(headlightSpot);
+    truckGroup.add(headlightSpot.target);
+
+    truckGroup.position.set(truck.x, 0, truck.z);
+    scene.add(truckGroup);
+    truck.mesh = truckGroup;
+}
+
+function buildPlayer3D() {
+    playerMesh = new THREE.Group();
+
+    // Player body / coat (Ropa amarilla para el protagonista)
+    const bodyGeo = new THREE.CylinderGeometry(0.35, 0.45, 1.4, 8);
+    const bodyMat = new THREE.MeshStandardMaterial({ color: 0xffea00, roughness: 0.4 }); // Yellow coat
+    const body = new THREE.Mesh(bodyGeo, bodyMat);
+    body.position.y = 0.7;
+    body.castShadow = true;
+    playerMesh.add(body);
+
+    // Head
+    const headGeo = new THREE.SphereGeometry(0.28, 10, 10);
+    const headMat = new THREE.MeshStandardMaterial({ color: 0xffcc80 });
+    const head = new THREE.Mesh(headGeo, headMat);
+    head.position.y = 1.6;
+    head.castShadow = true;
+    playerMesh.add(head);
+
+    // Gun in hand
+    const gunG = new THREE.Group();
+    const bGeo = new THREE.BoxGeometry(0.1, 0.12, 0.6);
+    const bMat = new THREE.MeshStandardMaterial({ color: 0x111111 });
+    const bMesh = new THREE.Mesh(bGeo, bMat);
+    gunG.add(bMesh);
+    gunG.position.set(0.3, 1.1, 0.2);
+    playerMesh.add(gunG);
+
+    playerMesh.position.set(player.x, 0, player.z);
+    playerMesh.visible = false;
+    scene.add(playerMesh);
+}
+
+function buildFirstPersonGun() {
+    gunGroup = new THREE.Group();
+
+    // Rifle barrel
+    const barrelGeo = new THREE.CylinderGeometry(0.04, 0.05, 0.8, 8);
+    const barrelMat = new THREE.MeshStandardMaterial({ color: 0x2c3e50, metalness: 0.8, roughness: 0.2 });
+    const barrel = new THREE.Mesh(barrelGeo, barrelMat);
+    barrel.rotation.x = Math.PI / 2;
+    barrel.position.set(0, 0, -0.4);
+    gunGroup.add(barrel);
+
+    // Gun body
+    const bodyGeo = new THREE.BoxGeometry(0.12, 0.16, 0.5);
+    const bodyMat = new THREE.MeshStandardMaterial({ color: 0x111111, metalness: 0.5 });
+    const body = new THREE.Mesh(bodyGeo, bodyMat);
+    body.position.set(0, -0.05, -0.15);
+    gunGroup.add(body);
+
+    // Energy Core (Green glowing)
+    const coreGeo = new THREE.CylinderGeometry(0.05, 0.05, 0.2, 8);
+    const coreMat = new THREE.MeshBasicMaterial({ color: 0x00e676 });
+    const core = new THREE.Mesh(coreGeo, coreMat);
+    core.rotation.x = Math.PI / 2;
+    core.position.set(0, 0.02, -0.18);
+    gunGroup.add(core);
+
+    // Position gun in camera view (bottom right)
+    gunGroup.position.set(0.25, -0.22, -0.45);
+    camera.add(gunGroup);
+    scene.add(camera);
+}
+
+function createOrc3D(x, z) {
+    const orcGroup = new THREE.Group();
+
+    // Body / Torso
+    const torsoGeo = new THREE.BoxGeometry(0.9, 1.1, 0.6);
+    const torsoMat = new THREE.MeshStandardMaterial({ color: 0x1b2631, roughness: 0.7 });
+    const torso = new THREE.Mesh(torsoGeo, torsoMat);
+    torso.position.y = 1.15;
+    torso.castShadow = true;
+    orcGroup.add(torso);
+
+    // Head
+    const headGeo = new THREE.SphereGeometry(0.4, 10, 10);
+    const headMat = new THREE.MeshStandardMaterial({ color: 0x273746, roughness: 0.6 });
+    const head = new THREE.Mesh(headGeo, headMat);
+    head.position.y = 1.9;
+    head.castShadow = true;
+    orcGroup.add(head);
+
+    // Glowing Red Eyes
+    const eyeGeo = new THREE.SphereGeometry(0.08, 6, 6);
+    const eyeMat = new THREE.MeshBasicMaterial({ color: 0xff0033 });
+    const eyeL = new THREE.Mesh(eyeGeo, eyeMat);
+    eyeL.position.set(-0.15, 1.95, 0.35);
+    orcGroup.add(eyeL);
+
+    const eyeR = new THREE.Mesh(eyeGeo, eyeMat);
+    eyeR.position.set(0.15, 1.95, 0.35);
+    orcGroup.add(eyeR);
+
+    // Shouting HTML Badge element
+    const shoutText = MONSTER_SHOUTS[Math.floor(Math.random() * MONSTER_SHOUTS.length)];
+    const shoutEl = document.createElement('div');
+    shoutEl.className = 'shout-label';
+    shoutEl.innerText = shoutText;
+    document.getElementById('shouts-container').appendChild(shoutEl);
+
+    orcGroup.position.set(x, 0, z);
+    scene.add(orcGroup);
+
+    const monster = {
+        id: Math.random(),
+        mesh: orcGroup,
+        shoutEl: shoutEl,
+        x: x,
+        z: z,
+        speed: 4.5 + Math.random() * 3.0,
+        hp: 2,
+        radius: 0.8,
+        pulse: Math.random() * Math.PI
+    };
+
+    monsters.push(monster);
+}
+
+function spawnParticleFX(pos, colorHex, count = 8) {
+    for (let i = 0; i < count; i++) {
+        const pGeo = new THREE.SphereGeometry(0.12 + Math.random() * 0.12, 6, 6);
+        const pMat = new THREE.MeshBasicMaterial({ color: colorHex, transparent: true, opacity: 1 });
+        const pMesh = new THREE.Mesh(pGeo, pMat);
+        pMesh.position.copy(pos);
+        scene.add(pMesh);
+
+        particles.push({
+            mesh: pMesh,
+            vx: (Math.random() - 0.5) * 8,
+            vy: Math.random() * 6 + 1,
+            vz: (Math.random() - 0.5) * 8,
+            life: 1.0,
+            decay: 0.04 + Math.random() * 0.04
+        });
+    }
+}
+
+function setupInputListeners() {
+    window.addEventListener('keydown', (e) => {
+        const k = e.key.toLowerCase();
+        keys[k] = true;
+        keys[e.code] = true;
+
+        // Liberar el puntero del mouse al presionar la tecla Esc
+        if (e.key === 'Escape' || e.code === 'Escape') {
+            if (document.pointerLockElement) {
+                document.exitPointerLock();
+            }
+        }
+
+        if ((k === 'c' || e.code === 'KeyC') && gameRunning) {
+            toggleVehicle();
+        }
+        if ((k === 'v' || e.code === 'KeyV') && gameRunning) {
+            toggleCameraView();
+        }
+        if (e.code === 'Space' && gameRunning && !player.inTruck) {
+            shootLaser();
+        }
+    });
+
+    window.addEventListener('keyup', (e) => {
+        const k = e.key.toLowerCase();
+        keys[k] = false;
+        keys[e.code] = false;
+    });
+
+    // Pointer Lock for First-Person Mouse Look
+    const container = document.getElementById('canvas-container');
+    container.addEventListener('click', () => {
+        if (gameRunning && !isPointerLocked) {
+            container.requestPointerLock();
+        }
+    });
+
+    document.addEventListener('pointerlockchange', () => {
+        isPointerLocked = (document.pointerLockElement === container);
+    });
+
+    document.addEventListener('mousemove', (e) => {
+        if (!gameRunning || !isPointerLocked) return;
+
+        const sensitivity = 0.0022;
+
+        if (is25DView) {
+            // En vista 2.5D, mover el ratón rota dinámicamente todo el escenario en 360° alrededor del jugador / camioneta
+            player.yaw -= e.movementX * sensitivity;
+            player.pitch -= e.movementY * sensitivity;
+            player.pitch = Math.max(-Math.PI / 4, Math.min(Math.PI / 8, player.pitch));
+            if (player.inTruck) {
+                truck.angle = player.yaw + Math.PI;
+            }
+        } else if (player.inTruck) {
+            // Mover la dirección de la camioneta directamente con el mouse
+            const steerSensitivity = 0.0025;
+            truck.angle -= e.movementX * steerSensitivity;
+            
+            // Mantener la vista fija hacia adelante
+            player.yaw = 0;
+            player.pitch -= e.movementY * sensitivity;
+            player.pitch = Math.max(-Math.PI / 6, Math.min(Math.PI / 6, player.pitch));
+        } else {
+            player.yaw -= e.movementX * sensitivity;
+            player.pitch -= e.movementY * sensitivity;
+            player.pitch = Math.max(-Math.PI / 2.2, Math.min(Math.PI / 2.2, player.pitch));
+        }
+    });
+
+    window.addEventListener('mousedown', (e) => {
+        if (gameRunning && isPointerLocked && e.button === 0 && !player.inTruck) {
+            shootLaser();
+        }
+    });
+
+    // Touch controls for mobile / tablet
+    const joystickZone = document.getElementById('touch-joystick-zone');
+    const joystickStick = document.getElementById('touch-joystick-stick');
+    let touchId = null;
+    let startX = 0, startY = 0;
+
+    joystickZone.addEventListener('touchstart', (e) => {
+        if (e.touches.length > 0) {
+            const touch = e.touches[0];
+            touchId = touch.identifier;
+            startX = touch.clientX;
+            startY = touch.clientY;
+        }
+    }, { passive: true });
+
+    joystickZone.addEventListener('touchmove', (e) => {
+        for (let i = 0; i < e.touches.length; i++) {
+            if (e.touches[i].identifier === touchId) {
+                const touch = e.touches[i];
+                const dx = touch.clientX - startX;
+                const dy = touch.clientY - startY;
+                const dist = Math.min(45, Math.hypot(dx, dy));
+                const angle = Math.atan2(dy, dx);
+                
+                const stickX = Math.cos(angle) * dist;
+                const stickY = Math.sin(angle) * dist;
+                joystickStick.style.transform = `translate(${stickX}px, ${stickY}px)`;
+
+                touchInput.moveX = stickX / 45;
+                touchInput.moveY = stickY / 45;
+            }
+        }
+    }, { passive: true });
+
+    const resetJoystick = () => {
+        touchId = null;
+        touchInput.moveX = 0;
+        touchInput.moveY = 0;
+        joystickStick.style.transform = `translate(0px, 0px)`;
+    };
+
+    joystickZone.addEventListener('touchend', resetJoystick, { passive: true });
+    joystickZone.addEventListener('touchcancel', resetJoystick, { passive: true });
+
+    document.getElementById('touch-shoot-btn').addEventListener('touchstart', (e) => {
+        e.preventDefault();
+        if (gameRunning && !player.inTruck) shootLaser();
+    });
+
+    document.getElementById('touch-vehicle-btn').addEventListener('touchstart', (e) => {
+        e.preventDefault();
+        if (gameRunning) toggleVehicle();
+    });
+
+    document.getElementById('touch-cam-btn').addEventListener('touchstart', (e) => {
+        e.preventDefault();
+        if (gameRunning) toggleCameraView();
+    });
+
+    document.getElementById('action-prompt').addEventListener('click', () => {
+        if (gameRunning) toggleVehicle();
+    });
+
+    // Detect touch device to display virtual controls
+    if ('ontouchstart' in window || navigator.maxTouchPoints > 0) {
+        document.getElementById('touch-controls').style.display = 'block';
+    }
+}
+
+function shootLaser() {
+    const now = Date.now();
+    if (now - lastShotTime < 140) return;
+    lastShotTime = now;
+
+    audio.playLaser();
+
+    // Recoil animation on gun
+    if (gunGroup && !is25DView) {
+        gunGroup.position.z = -0.35;
+        setTimeout(() => { if (gunGroup) gunGroup.position.z = -0.45; }, 80);
+    }
+
+    let dir, spawnPos;
+    if (is25DView) {
+        // Disparar siempre hacia adelante en vista 2.5D
+        dir = new THREE.Vector3(-Math.sin(player.yaw), 0, -Math.cos(player.yaw)).normalize();
+        spawnPos = new THREE.Vector3(player.x, 1.2, player.z).addScaledVector(dir, 1.0);
+    } else {
+        // Direction vector from camera orientation in 1st person
+        dir = new THREE.Vector3(0, 0, -1);
+        dir.applyQuaternion(camera.quaternion);
+        dir.normalize();
+        spawnPos = camera.position.clone().add(dir.clone().multiplyScalar(0.8));
+    }
+
+    // Spawn green glowing bullet mesh
+    const bGeo = new THREE.SphereGeometry(0.25, 8, 8);
+    const bMat = new THREE.MeshBasicMaterial({ color: 0x00ffcc });
+    const bMesh = new THREE.Mesh(bGeo, bMat);
+
+    bMesh.position.copy(spawnPos);
+    scene.add(bMesh);
+
+    bullets.push({
+        mesh: bMesh,
+        pos: spawnPos,
+        velocity: dir.multiplyScalar(45.0), // 45 m/s velocity
+        life: 180,
+        bounces: 3,
+        hitMonsters: new Set()
+    });
+}
+
+function toggleVehicle() {
+    const distToTruck = Math.hypot(player.x - truck.x, player.z - truck.z);
+
+    if (player.inTruck) {
+        player.inTruck = false;
+        player.x = truck.x - Math.sin(truck.angle) * 3.5;
+        player.z = truck.z - Math.cos(truck.angle) * 3.5;
+        if (!is25DView) gunGroup.visible = true;
+        audio.playDoor();
+    } else if (distToTruck < 6.0) {
+        player.inTruck = true;
+        player.yaw = 0; // Vista alineada al frente de la camioneta
+        player.pitch = -0.05;
+        gunGroup.visible = false;
+        audio.playDoor();
+    }
+    updateHUD();
+}
+
+function toggleCameraView() {
+    is25DView = !is25DView;
+    const btn = document.getElementById('btn-view-toggle');
+    if (btn) {
+        btn.innerText = is25DView ? "VISTA: 2.5D [V]" : "VISTA: 1ª PERSONA [V]";
+    }
+}
+
+function updateHUD() {
+    document.getElementById('score').innerText = score;
+    const statusElem = document.getElementById('vehicle-status');
+    if (player.inTruck) {
+        statusElem.innerText = "En Camioneta (Blindado)";
+        statusElem.style.color = "#00e676";
+    } else {
+        statusElem.innerText = "A pie";
+        statusElem.style.color = "#ffeb3b";
+    }
+}
+
+function update(delta) {
+    if (!gameRunning) return;
+
+    waveTime += delta;
+
+    // --- 1. Player & Truck Movement Controls ---
+    let inputForward = 0;
+    let inputSide = 0;
+
+    if (keys['w'] || keys['arrowup']) inputForward += 1;
+    if (keys['s'] || keys['arrowdown']) inputForward -= 1;
+    if (keys['a'] || keys['arrowleft']) inputSide -= 1;
+    if (keys['d'] || keys['arrowright']) inputSide += 1;
+
+    // Apply mobile touch joysticks
+    if (touchInput.moveY !== 0) inputForward -= touchInput.moveY;
+    if (touchInput.moveX !== 0) inputSide += touchInput.moveX;
+
+    if (player.inTruck) {
+        // Truck physics
+        if (inputForward > 0) {
+            truck.speed = Math.min(truck.speed + truck.acceleration, truck.maxSpeed);
+        } else if (inputForward < 0) {
+            truck.speed = Math.max(truck.speed - truck.acceleration, -truck.maxSpeed * 0.45);
+        } else {
+            truck.speed *= truck.friction;
+        }
+
+        // Giro secundario con teclado A/D si se desea
+        if (inputSide !== 0 && Math.abs(truck.speed) > 0.1) {
+            const dir = truck.speed >= 0 ? 1 : -1;
+            truck.angle -= inputSide * 0.035 * dir;
+        }
+
+        truck.x += Math.sin(truck.angle) * truck.speed * delta;
+        truck.z += Math.cos(truck.angle) * truck.speed * delta;
+
+        // Boundaries along road
+        const halfRoad = ROAD_WIDTH / 2 - 2.0;
+        truck.x = Math.max(-halfRoad, Math.min(halfRoad, truck.x));
+        truck.z = Math.max(-ROAD_LENGTH / 2 + 10, Math.min(ROAD_LENGTH / 2 - 10, truck.z));
+
+        truck.mesh.position.set(truck.x, 0, truck.z);
+        truck.mesh.rotation.y = truck.angle;
+
+        // Update player coordinates to match truck
+        player.x = truck.x;
+        player.z = truck.z;
+
+        if (is25DView) {
+            // Cámara isométrica 2.5D orbitando alrededor de la camioneta alineada a la mira roja
+            const camDist = 18.0;
+            const camHeight = 14.0 + Math.sin(player.pitch) * 6.0;
+            const targetX = truck.x - Math.sin(player.yaw) * 6.0;
+            const targetZ = truck.z - Math.cos(player.yaw) * 6.0;
+
+            camera.position.set(
+                truck.x + Math.sin(player.yaw) * camDist,
+                camHeight,
+                truck.z + Math.cos(player.yaw) * camDist
+            );
+            camera.lookAt(targetX, 1.0, targetZ);
+            gunGroup.visible = false;
+            if (playerMesh) playerMesh.visible = false;
+        } else {
+            // Attach Camera to Driver Seat inside Truck
+            const driverOffset = new THREE.Vector3(0, 1.8, 0.2);
+            driverOffset.applyAxisAngle(new THREE.Vector3(0, 1, 0), truck.angle);
+            camera.position.set(truck.x + driverOffset.x, driverOffset.y, truck.z + driverOffset.z);
+
+            // Vista siempre orientada hacia el frente de la camioneta
+            player.yaw = 0;
+            const euler = new THREE.Euler(player.pitch, truck.angle + Math.PI, 0, 'YXZ');
+            camera.quaternion.setFromEuler(euler);
+            gunGroup.visible = false;
+            if (playerMesh) playerMesh.visible = false;
+        }
+
+        audio.updateEngineSound(Math.abs(truck.speed), true);
+
+    } else {
+        // On Foot Movement
+        audio.updateEngineSound(0, false);
+
+        // Determine movement direction relative to camera yaw
+        const moveDir = new THREE.Vector3(inputSide, 0, -inputForward).normalize();
+        moveDir.applyAxisAngle(new THREE.Vector3(0, 1, 0), player.yaw);
+
+        player.x += moveDir.x * player.speed * delta;
+        player.z += moveDir.z * player.speed * delta;
+
+        const halfRoad = ROAD_WIDTH / 2 - 1.2;
+        player.x = Math.max(-halfRoad, Math.min(halfRoad, player.x));
+        player.z = Math.max(-ROAD_LENGTH / 2 + 5, Math.min(ROAD_LENGTH / 2 - 5, player.z));
+
+        if (playerMesh) {
+            playerMesh.position.set(player.x, 0, player.z);
+            playerMesh.rotation.y = player.yaw;
+        }
+
+        if (is25DView) {
+            // Cámara isométrica 2.5D orbitando alrededor del jugador y apuntando adelante hacia la mira roja
+            const camDist = 16.0;
+            const camHeight = 13.0 + Math.sin(player.pitch) * 5.0;
+            const targetX = player.x - Math.sin(player.yaw) * 6.0;
+            const targetZ = player.z - Math.cos(player.yaw) * 6.0;
+
+            camera.position.set(
+                player.x + Math.sin(player.yaw) * camDist,
+                camHeight,
+                player.z + Math.cos(player.yaw) * camDist
+            );
+            camera.lookAt(targetX, 1.2, targetZ);
+            gunGroup.visible = false;
+            if (playerMesh) playerMesh.visible = true;
+        } else {
+            // First Person Camera Position
+            camera.position.set(player.x, player.height, player.z);
+            const euler = new THREE.Euler(player.pitch, player.yaw, 0, 'YXZ');
+            camera.quaternion.setFromEuler(euler);
+            gunGroup.visible = true;
+            if (playerMesh) playerMesh.visible = false;
+        }
+    }
+
+    // Action Prompt when near Truck
+    const distToTruck = Math.hypot(player.x - truck.x, player.z - truck.z);
+    const promptElem = document.getElementById('action-prompt');
+    if (!player.inTruck && distToTruck < 6.0) {
+        promptElem.style.display = 'block';
+    } else {
+        promptElem.style.display = 'none';
+    }
+
+    // --- 2. Bouncing Laser Physics & Collisions ---
+    const boundX = ROAD_WIDTH / 2 - 0.5;
+    const boundZ = ROAD_LENGTH / 2 - 1.0;
+
+    for (let i = bullets.length - 1; i >= 0; i--) {
+        const b = bullets[i];
+        b.pos.addScaledVector(b.velocity, delta);
+        b.mesh.position.copy(b.pos);
+        b.life--;
+
+        // Bounce off side shop walls / road boundaries
+        if (Math.abs(b.pos.x) >= boundX && b.bounces > 0) {
+            b.velocity.x *= -1;
+            b.pos.x = Math.sign(b.pos.x) * boundX;
+            b.bounces--;
+            audio.playBounce();
+            spawnParticleFX(b.pos, 0x00e676, 5);
+        }
+
+        if (Math.abs(b.pos.z) >= boundZ && b.bounces > 0) {
+            b.velocity.z *= -1;
+            b.pos.z = Math.sign(b.pos.z) * boundZ;
+            b.bounces--;
+            audio.playBounce();
+            spawnParticleFX(b.pos, 0x00e676, 5);
+        }
+
+        if (b.life <= 0) {
+            scene.remove(b.mesh);
+            bullets.splice(i, 1);
+        }
+    }
+
+    // --- 3. Orc Spawning & AI Pursuit ---
+    spawnTimer += delta;
+    if (spawnTimer > Math.max(0.6, 2.2 - score * 0.05)) {
+        spawnTimer = 0;
+        const spawnSide = Math.random() < 0.5 ? -1 : 1;
+        const spawnX = (Math.random() - 0.5) * (ROAD_WIDTH - 4);
+        const spawnZ = player.z + spawnSide * (40 + Math.random() * 30);
+
+        createOrc3D(spawnX, spawnZ);
+    }
+
+    for (let i = monsters.length - 1; i >= 0; i--) {
+        const m = monsters[i];
+
+        // Move towards player
+        const dx = player.x - m.x;
+        const dz = player.z - m.z;
+        const dist = Math.hypot(dx, dz);
+
+        if (dist > 0.1) {
+            m.x += (dx / dist) * m.speed * delta;
+            m.z += (dz / dist) * m.speed * delta;
+            m.mesh.position.set(m.x, 0, m.z);
+            m.mesh.rotation.y = Math.atan2(dx, dz);
+        }
+
+        // Update Orc HTML Shout Badge Position (3D to 2D projection)
+        const headWorldPos = new THREE.Vector3(m.x, 2.6, m.z);
+        headWorldPos.project(camera);
+
+        if (headWorldPos.z < 1.0) {
+            const screenX = (headWorldPos.x * 0.5 + 0.5) * window.innerWidth;
+            const screenY = (-(headWorldPos.y * 0.5) + 0.5) * window.innerHeight;
+            m.shoutEl.style.left = `${screenX}px`;
+            m.shoutEl.style.top = `${screenY}px`;
+            m.shoutEl.style.display = 'block';
+        } else {
+            m.shoutEl.style.display = 'none';
+        }
+
+        // Crushing Orcs with Green 4x4 Truck
+        if (player.inTruck && Math.abs(truck.speed) > 4.0) {
+            const distTruckOrc = Math.hypot(truck.x - m.x, truck.z - m.z);
+            if (distTruckOrc < 2.5) {
+                spawnParticleFX(m.mesh.position, 0xd50000, 14);
+                audio.playSplat();
+                removeOrc(i);
+                score++;
+                updateHUD();
+                continue;
+            }
+        }
+
+        // Orc hits player on foot -> Push back
+        if (!player.inTruck && dist < m.radius + 0.8) {
+            const overlap = (m.radius + 0.8) - dist;
+            if (dist > 0) {
+                m.x -= (dx / dist) * overlap;
+                m.z -= (dz / dist) * overlap;
+            }
+        }
+
+        // Laser Bullet Hits Orc
+        for (let j = 0; j < bullets.length; j++) {
+            const b = bullets[j];
+            if (b.hitMonsters.has(m.id)) continue;
+
+            const bulletDist = b.pos.distanceTo(new THREE.Vector3(m.x, 1.2, m.z));
+            if (bulletDist < m.radius + 0.5) {
+                m.hp -= 2;
+                b.hitMonsters.add(m.id);
+                spawnParticleFX(b.pos, 0x00ffff, 6);
+
+                if (m.hp <= 0) {
+                    spawnParticleFX(m.mesh.position, 0xd50000, 12);
+                    audio.playExplosion();
+                    removeOrc(i);
+                    score++;
+                    updateHUD();
+                    break;
+                }
+            }
+        }
+    }
+
+    // --- 4. Particles Animation ---
+    for (let i = particles.length - 1; i >= 0; i--) {
+        const p = particles[i];
+        p.mesh.position.x += p.vx * delta;
+        p.mesh.position.y += p.vy * delta;
+        p.mesh.position.z += p.vz * delta;
+        p.vy -= 9.8 * delta; // Gravity
+
+        p.life -= p.decay;
+        p.mesh.material.opacity = p.life;
+
+        if (p.life <= 0 || p.mesh.position.y < 0) {
+            scene.remove(p.mesh);
+            particles.splice(i, 1);
+        }
+    }
+}
+
+function removeOrc(index) {
+    const m = monsters[index];
+    scene.remove(m.mesh);
+    if (m.shoutEl && m.shoutEl.parentNode) {
+        m.shoutEl.parentNode.removeChild(m.shoutEl);
+    }
+    monsters.splice(index, 1);
+}
+
+function clearAllMonsters() {
+    for (let i = monsters.length - 1; i >= 0; i--) {
+        removeOrc(i);
+    }
+    bullets.forEach(b => scene.remove(b.mesh));
+    bullets = [];
+    particles.forEach(p => scene.remove(p.mesh));
+    particles = [];
+}
+
+let clock = new THREE.Clock();
+
+function gameLoop() {
+    if (!gameRunning) return;
+    requestAnimationFrame(gameLoop);
+
+    const delta = Math.min(0.05, clock.getDelta());
+    update(delta);
+    renderer.render(scene, camera);
+}
+
+function startGame() {
+    audio.init();
+    document.getElementById('start-screen').style.display = 'none';
+    document.getElementById('game-over-screen').style.display = 'none';
+    closeCredits();
+
+    score = 0;
+    player.inTruck = false;
+    player.x = 0;
+    player.z = 20;
+    player.yaw = 0;
+    player.pitch = 0;
+
+    truck.x = -4;
+    truck.z = 0;
+    truck.speed = 0;
+    truck.angle = 0;
+    if (truck.mesh) {
+        truck.mesh.position.set(truck.x, 0, truck.z);
+        truck.mesh.rotation.y = 0;
+    }
+
+    if (gunGroup) gunGroup.visible = true;
+
+    clearAllMonsters();
+
+    gameRunning = true;
+    clock.start();
+    updateHUD();
+
+    // Lock pointer for mouse look
+    const container = document.getElementById('canvas-container');
+    if (container.requestPointerLock) {
+        container.requestPointerLock();
+    }
+
+    requestAnimationFrame(gameLoop);
+}
+
+function restartGame() {
+    startGame();
+}
+
+function gameOver() {
+    gameRunning = false;
+    audio.updateEngineSound(0, false);
+    if (document.exitPointerLock) document.exitPointerLock();
+    document.getElementById('final-score').innerText = score;
+    document.getElementById('game-over-screen').style.display = 'flex';
+}
+
+function openCredits() {
+    document.getElementById('credits-modal').style.display = 'flex';
+}
+
+function closeCredits() {
+    document.getElementById('credits-modal').style.display = 'none';
+}
+
+function onWindowResize() {
+    camera.aspect = window.innerWidth / window.innerHeight;
+    camera.updateProjectionMatrix();
+    renderer.setSize(window.innerWidth, window.innerHeight);
+}
+
+// Initialize Three.js scene on page load
+window.onload = function() {
+    initThree();
+};
+</script>
+</body>
+</html>
